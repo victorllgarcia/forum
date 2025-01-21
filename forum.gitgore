@@ -1,0 +1,149 @@
+// ForumHub API Challenge
+
+// pom.xml
+<!-- Define the Maven dependencies -->
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <scope>runtime</scope>
+    </dependency>
+</dependencies>
+
+// application.properties
+# Database Configuration
+spring.datasource.url=jdbc:h2:mem:forumhub
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.h2.console.enabled=true
+
+// Security Configuration (basic authentication for simplicity)
+spring.security.user.name=admin
+spring.security.user.password=admin
+
+// Tabela - Modelo do banco de dados
+// Topic Entity
+@Entity
+public class Topic {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotNull
+    private String title;
+
+    @NotNull
+    @Lob
+    private String content;
+
+    @NotNull
+    private String author;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    // Getters and setters
+}
+
+// Repositório
+@Repository
+public interface TopicRepository extends JpaRepository<Topic, Long> {
+}
+
+// Service
+@Service
+public class TopicService {
+
+    private final TopicRepository topicRepository;
+
+    public TopicService(TopicRepository topicRepository) {
+        this.topicRepository = topicRepository;
+    }
+
+    public List<Topic> findAll() {
+        return topicRepository.findAll();
+    }
+
+    public Optional<Topic> findById(Long id) {
+        return topicRepository.findById(id);
+    }
+
+    public Topic save(Topic topic) {
+        return topicRepository.save(topic);
+    }
+
+    public void deleteById(Long id) {
+        topicRepository.deleteById(id);
+    }
+}
+
+// Controller
+@RestController
+@RequestMapping("/api/topics")
+public class TopicController {
+
+    private final TopicService topicService;
+
+    public TopicController(TopicService topicService) {
+        this.topicService = topicService;
+    }
+
+    @GetMapping
+    public List<Topic> getAllTopics() {
+        return topicService.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Topic> getTopicById(@PathVariable Long id) {
+        return topicService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    public ResponseEntity<Topic> createTopic(@RequestBody @Valid Topic topic) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(topicService.save(topic));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Topic> updateTopic(@PathVariable Long id, @RequestBody @Valid Topic updatedTopic) {
+        return topicService.findById(id)
+                .map(topic -> {
+                    topic.setTitle(updatedTopic.getTitle());
+                    topic.setContent(updatedTopic.getContent());
+                    return ResponseEntity.ok(topicService.save(topic));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTopic(@PathVariable Long id) {
+        if (topicService.findById(id).isPresent()) {
+            topicService.deleteById(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+}
